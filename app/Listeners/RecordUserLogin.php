@@ -9,6 +9,10 @@ class RecordUserLogin
 {
     public function handle(Login $event): void
     {
+        if (request()->routeIs('register.store')) {
+            return;
+        }
+
         if (! ($event->user instanceof User)) {
             return;
         }

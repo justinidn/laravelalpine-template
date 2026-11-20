@@ -1,22 +1,34 @@
 <x-app-layout>
-    <div x-data="userPage" x-on:user-saved.window="refreshTable()">
-        <x-table-data name="usersList" endpoint="{{ route('users.index') }}" :pagination="true">
+    <div class="mb-3">
+        <x-breadcrumbs :items="Breadcrumbs::generate('users.index')" />
+    </div>
 
-            <div class="d-flex align-items-center gap-2 w-100">
-                <label class="form-control form-control-sm form-adorn flex-grow-1 mb-0">
-                    <div class="form-adorn-icon" aria-hidden="true">
-                        <i class="bi bi-search"></i>
-                    </div>
-                    <input type="search" class="form-ghost w-100" placeholder="Search Name,NRK" x-model.trim="filters.search" @input.debounce.400ms="applyFilters()">
-                </label>
+    {{-- Header halaman: judul + keterangan di kiri, tombol tambah di kanan --}}
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3" x-data="{}">
+        <div>
+            <h1 class="h4 fw-bold text-body-emphasis mb-1">Halaman User</h1>
+            <div class="form-text">Kelola data pengguna, status aktif, dan hak akses login.</div>
+        </div>
+        <div class="flex-shrink-0">
+            <x-button-add x-on:click="$dispatch('open-users-modal')" />
+        </div>
+    </div>
+    <hr>
 
-                <div class="d-flex align-items-center gap-2 flex-shrink-0">
-                    <span class="d-inline-block rounded-3" tabindex="0" data-bs-toggle="popover" data-bs-trigger="hover focus" data-bs-content="Advanced Search">
-                        <button class="btn-solid theme-primary btn-sm" type="button" data-bs-toggle="drawer" data-bs-target="#drawerRight" aria-controls="drawerRight"><i class="bi bi-funnel-fill"></i></button>
-                    </span>
-                    <x-button-add @click="$dispatch('open-users-modal')" data-bs-toggle="dialog" data-bs-target="#usersModal" data-bs-backdrop="static" />
+    <div x-data="userPage">
+        <x-table-data name="usersList" endpoint="{{ route('users.index') }}" :pagination="true" :refreshEvents="['user-saved']">
+
+            <label class="form-control form-control-sm form-adorn flex-grow-1 mb-0">
+                <div class="form-adorn-icon" aria-hidden="true">
+                    <i class="bi bi-search"></i>
                 </div>
-            </div>
+                <input type="search" class="form-ghost w-100" placeholder="Cari nama user ..." x-model.trim="filters.search" @input.debounce.400ms="applyFilters()">
+            </label>
+
+            <span class="d-inline-block rounded-3 flex-shrink-0" tabindex="0" data-bs-toggle="popover" data-bs-trigger="hover focus" data-bs-content="Advanced Search">
+                <button class="btn-solid theme-primary btn-sm" type="button" data-bs-toggle="drawer" data-bs-target="#drawerRight" aria-controls="drawerRight"><i class="bi bi-funnel-fill"></i></button>
+            </span>
+
             <dialog class="drawer drawer-end" data-bs-backdrop="false" data-bs-scroll="true" tabindex="-1" id="drawerRight" aria-labelledby="drawerRightLabel">
                 <div class="drawer-header">
                     <h5 class="drawer-title" id="drawerRightLabel">Advanced Filters</h5>
@@ -24,14 +36,13 @@
                 </div>
                 <div class="drawer-body">
                     <div class="mb-1">
-                        <label for="department_cari" class="form-label">Department</label>
+                        <label for="department_cari" class="form-label">Departemen</label>
                         <select class="form-control form-control-sm" id="department_cari" x-model="filters.department_cari">
                             <option value="">Pilih Department</option>
                             @foreach($departments as $id => $name)
                             <option value="{{ $id }}">{{ $name }}</option>
                             @endforeach
                         </select>
-
                     </div>
                     <div class="mb-1">
                         <label for="status" class="form-label">Status</label>
@@ -49,11 +60,12 @@
             <x-slot name="thead" class="text-center">
                 <th style="width: 50px;" class="text-center">No</th>
                 <th class="text-center">Nama</th>
-                <th style="width: 200px;" class="text-center">Department</th>
+                <th style="width: 140px;" class="text-center">Departemen</th>
                 <th style="width: 140px;" class="text-center">Status</th>
-                <th style="width: 140px;" class="text-center">Can Login</th>
-                <th style="width: 120px;" class="text-center">Action</th>
-
+                <th style="width: 140px;" class="text-center">Akses</th>
+                @canany(['users.update', 'users.delete'])
+                <th style="width: 140px;" class="text-center">Aksi</th>
+                @endcanany
             </x-slot>
 
             <x-slot name="tbody">
@@ -61,48 +73,51 @@
                 <td x-text="item.name"></td>
                 <td class="text-center" x-text="item.department?.department_alias || 'N/A'"></td>
                 <td class="text-center">
-                    <span class="badge rounded-pill px-3 py-1" :class="item.is_active ? 'bg-primary' : 'bg-danger'" x-text="item.is_active ? 'Aktif' : 'Non-Aktif'"></span>
+                    <template x-if="item.is_active">
+                        <span class="badge badge-subtle theme-success"><i class="bi bi-check-circle-fill text-success fs-5" title="Aktif"></i> Aktif</span>
+                    </template>
+                    <template x-if="!item.is_active">
+                        <span class="badge badge-subtle theme-danger"><i class="bi bi-x-circle-fill text-danger fs-5" title="Non-Aktif"></i> Non-Aktif</span>
+                    </template>
                 </td>
                 <td class="text-center">
                     <template x-if="item.can_login">
-                        <i class="bi bi-check-circle-fill text-success fs-5" title="Ya"></i>
+                        <span class="badge badge-subtle theme-success"><i class="bi bi-check-circle-fill text-success fs-5" title="Ya"></i> Ya</span>
                     </template>
                     <template x-if="!item.can_login">
-                        <i class="bi bi-x-circle-fill text-danger fs-5" title="Tidak"></i>
+                        <span class="badge badge-subtle theme-danger"><i class="bi bi-x-circle-fill text-danger fs-5" title="Tidak"></i> Tidak</span>
                     </template>
                 </td>
+                @canany(['users.update', 'users.delete'])
                 <td class="text-center">
                     <div class="position-relative">
                         <button class="btn btn-sm btn-light border-0 px-2 py-1 shadow-none" type="button" data-bs-toggle="menu" aria-expanded="false">
                             <i class="bi bi-three-dots"></i>
                         </button>
                         <div class="menu">
+                            @can('users.update')
                             <button type="button" class="menu-item text-warning" @click="editItem(item)">
                                 <i class="bi bi-pencil-square"></i> Edit
                             </button>
+                            @endcan
+                            @can('users.delete')
                             <button type="button" class="menu-item text-danger" @click="deleteItem(item.id)">
                                 <i class="bi bi-trash3-fill"></i> Hapus
                             </button>
+                            @endcan
                         </div>
                     </div>
                 </td>
+                @endcanany
             </x-slot>
         </x-table-data>
 
-        {{-- Include Modal Form --}}
         @include('users.partials.users-form')
     </div>
-
 
     <script>
         document.addEventListener('alpine:init', () => {
             Alpine.data('userPage', () => ({
-                refreshTable() {
-                    const table = this.$el.querySelector('.card');
-                    if (table && Alpine.$data(table)) {
-                        Alpine.$data(table).fetchData(1);
-                    }
-                },
                 editItem(item) {
                     window.dispatchEvent(new CustomEvent('edit-users-modal', {
                         detail: item
@@ -113,23 +128,10 @@
                         axios.delete("{{ route('users.destroy', ['user' => '__ID__']) }}".replace('__ID__', id))
                             .then(response => {
                                 window.dispatchEvent(new CustomEvent('user-saved'));
-                                window.dispatchEvent(new CustomEvent('show-toast', {
-                                    detail: {
-                                        title: 'Berhasil',
-                                        message: response.data.message || 'Data berhasil dihapus.',
-                                        type: 'success'
-                                    }
-                                }));
+                                alert(response.data.message || 'Data berhasil dihapus.');
                             })
                             .catch(error => {
-                                let errorMsg = error.response?.data?.message || 'Terjadi kesalahan pada server.';
-                                window.dispatchEvent(new CustomEvent('show-toast', {
-                                    detail: {
-                                        title: 'Peringatan',
-                                        message: errorMsg,
-                                        type: 'error'
-                                    }
-                                }));
+                                alert(error.response?.data?.message || 'Terjadi kesalahan pada server.');
                             });
                     }
                 }

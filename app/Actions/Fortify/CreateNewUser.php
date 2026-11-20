@@ -2,12 +2,15 @@
 
 namespace App\Actions\Fortify;
 
+use App\Models\Department;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Laravel\Fortify\Contracts\CreatesNewUsers;
+use Spatie\Permission\Models\Permission;
 
 class CreateNewUser implements CreatesNewUsers
 {
@@ -25,6 +28,10 @@ class CreateNewUser implements CreatesNewUsers
         Validator::make($input, [
             'name' => ['required', 'string', 'max:255'],
             'nrk' => ['required', 'digits:7', Rule::unique(User::class, 'nrk')],
+            'department_id' => [
+                'required',
+                Rule::exists(Department::class, 'id')->where('is_active', true),
+            ],
             'email' => [
                 'required',
                 'string',
@@ -35,11 +42,18 @@ class CreateNewUser implements CreatesNewUsers
             'password' => $this->passwordRules(),
         ])->validate();
 
-        return User::create([
-            'name' => $input['name'],
-            'nrk' => $input['nrk'],
-            'email' => $input['email'],
-            'password' => Hash::make($input['password']),
-        ]);
+        return DB::transaction(function () use ($input): User {
+            $user = User::create([
+                'name' => $input['name'],
+                'nrk' => $input['nrk'],
+                'department_id' => $input['department_id'],
+                'email' => $input['email'],
+                'password' => Hash::make($input['password']),
+            ]);
+
+            $user->givePermissionTo(Permission::findOrCreate('system.login', 'web'));
+
+            return $user;
+        });
     }
 }

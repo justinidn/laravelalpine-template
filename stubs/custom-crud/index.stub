@@ -1,23 +1,37 @@
 <x-app-layout>
-    <div x-data="{{singularVariable}}Page" x-on:{{singularVariable}}-saved.window="refreshTable()">
-        <x-table-data name="{{variableName}}List" endpoint="{{ route('{{pluralKebab}}.index') }}" :pagination="true">
+    <div class="mb-3">
+        <x-breadcrumbs :items="Breadcrumbs::generate('{{pluralKebab}}.index')" />
+    </div>
 
-            <div class="d-flex align-items-center gap-2 w-100">
-                <label class="form-control form-control-sm form-adorn flex-grow-1 mb-0">
-                    <div class="form-adorn-icon" aria-hidden="true">
-                        <i class="bi bi-search"></i>
-                    </div>
-                    <input type="search" class="form-ghost w-100" placeholder="Search {{modelName}}" x-model.trim="filters.search" @input.debounce.400ms="applyFilters()">
-                </label>
+    {{-- Header halaman: judul + keterangan di kiri, tombol tambah di kanan --}}
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3" x-data="{}">
+        <div>
+            <h1 class="h4 fw-bold text-body-emphasis mb-1">Halaman {{modelName}}</h1>
+            <div class="form-text">Kelola data {{modelName}}.</div>
+        </div>
+        <div class="flex-shrink-0">
+            @can('{{pluralKebab}}.create')
+            <x-button-add x-on:click="$dispatch('open-{{pluralKebab}}-modal')" />
+            @endcan
+        </div>
+    </div>
+    <hr>
 
-                <div class="d-flex align-items-center gap-2 flex-shrink-0">
-                    <span class="d-inline-block rounded-3" tabindex="0" data-bs-toggle="popover" data-bs-trigger="hover focus" data-bs-content="Advanced Search">
-                        <button class="btn-solid theme-primary btn-sm" type="button" data-bs-toggle="drawer" data-bs-target="#drawerRight" aria-controls="drawerRight"><i class="bi bi-funnel-fill"></i></button>
-                    </span>
-                    @can('{{pluralKebab}}.create')
-                    <x-button-add @click="$dispatch('open-{{pluralKebab}}-modal')" data-bs-toggle="dialog" data-bs-target="#{{pluralKebab}}Modal" data-bs-backdrop="static" />
-                    @endcan
+    <div x-data="{{singularVariable}}Page">
+        <x-table-data name="{{variableName}}List" endpoint="{{ route('{{pluralKebab}}.index') }}" :pagination="true" :refreshEvents="['{{pluralKebab}}-saved']">
+
+            {{-- Slot: langsung input search + tombol filter (sesuai komponen x-table-data terbaru) --}}
+            <label class="form-control form-control-sm form-adorn flex-grow-1 mb-0">
+                <div class="form-adorn-icon" aria-hidden="true">
+                    <i class="bi bi-search"></i>
                 </div>
+                <input type="search" class="form-ghost w-100" placeholder="Cari {{modelName}} ..." x-model.trim="filters.search" @input.debounce.400ms="applyFilters()">
+            </label>
+
+            <div class="flex-shrink-0">
+                <span class="d-inline-block rounded-3" tabindex="0" data-bs-toggle="popover" data-bs-trigger="hover focus" data-bs-content="Advanced Search">
+                    <button class="btn-solid theme-primary btn-sm" type="button" data-bs-toggle="drawer" data-bs-target="#drawerRight" aria-controls="drawerRight"><i class="bi bi-funnel-fill"></i></button>
+                </span>
             </div>
 
             <dialog class="drawer drawer-end" data-bs-backdrop="false" data-bs-scroll="true" tabindex="-1" id="drawerRight" aria-labelledby="drawerRightLabel">
@@ -44,7 +58,7 @@
                 <th class="text-center">Nama</th>
                 <th style="width: 140px;" class="text-center">Status</th>
                 @canany(['{{pluralKebab}}.update', '{{pluralKebab}}.delete'])
-                <th style="width: 120px;" class="text-center">Action</th>
+                <th style="width: 140px;" class="text-center">Aksi</th>
                 @endcanany
             </x-slot>
 
@@ -52,7 +66,12 @@
                 <td class="text-center" x-text="(items.from || 1) + index"></td>
                 <td x-text="item.name"></td>
                 <td class="text-center">
-                    <span class="badge rounded-pill px-3 py-1" :class="item.is_active ? 'bg-primary' : 'bg-danger'" x-text="item.is_active ? 'Aktif' : 'Non-Aktif'"></span>
+                    <template x-if="item.is_active">
+                        <span class="badge badge-subtle theme-success"><i class="bi bi-check-circle-fill text-success fs-5" title="Aktif"></i> Aktif</span>
+                    </template>
+                    <template x-if="!item.is_active">
+                        <span class="badge badge-subtle theme-danger"><i class="bi bi-x-circle-fill text-danger fs-5" title="Non-Aktif"></i> Non-Aktif</span>
+                    </template>
                 </td>
                 @canany(['{{pluralKebab}}.update', '{{pluralKebab}}.delete'])
                 <td class="text-center">
@@ -85,12 +104,6 @@
     <script>
         document.addEventListener('alpine:init', () => {
             Alpine.data('{{singularVariable}}Page', () => ({
-                refreshTable() {
-                    const table = this.$el.querySelector('.card');
-                    if (table && Alpine.$data(table)) {
-                        Alpine.$data(table).fetchData(1);
-                    }
-                },
                 editItem(item) {
                     window.dispatchEvent(new CustomEvent('edit-{{pluralKebab}}-modal', {
                         detail: item
@@ -100,24 +113,11 @@
                     if (confirm('Yakin ingin menghapus data ini?')) {
                         axios.delete("{{ route('{{pluralKebab}}.destroy', ['{{singularVariable}}' => '__ID__']) }}".replace('__ID__', id))
                             .then(response => {
-                                window.dispatchEvent(new CustomEvent('{{singularVariable}}-saved'));
-                                window.dispatchEvent(new CustomEvent('show-toast', {
-                                    detail: {
-                                        title: 'Berhasil',
-                                        message: response.data.message || 'Data berhasil dihapus.',
-                                        type: 'success'
-                                    }
-                                }));
+                                window.dispatchEvent(new CustomEvent('{{pluralKebab}}-saved'));
+                                alert(response.data.message || 'Data berhasil dihapus.');
                             })
                             .catch(error => {
-                                let errorMsg = error.response?.data?.message || 'Terjadi kesalahan pada server.';
-                                window.dispatchEvent(new CustomEvent('show-toast', {
-                                    detail: {
-                                        title: 'Peringatan',
-                                        message: errorMsg,
-                                        type: 'error'
-                                    }
-                                }));
+                                alert(error.response?.data?.message || 'Terjadi kesalahan pada server.');
                             });
                     }
                 }

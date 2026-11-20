@@ -1,17 +1,14 @@
-<dialog class="dialog dialog-scrollable" id="rolesModal" data-bs-backdrop="static" x-data="roleModal(@js($permissionModules))" @open-roles-modal.window="openAdd()" @edit-roles-modal.window="openEdit($event.detail)" @cancel.prevent>
+<dialog class="dialog dialog-scrollable" id="rolesModal" x-data="roleModal(@js($permissionModules))" @open-roles-modal.window="openAdd()" @edit-roles-modal.window="openEdit($event.detail)">
     <div class="dialog-header">
         <h1 class="dialog-title" x-text="isEdit ? 'Edit Role' : 'Tambah Role Baru'"></h1>
         <button type="button" class="btn-close" commandfor="rolesModal" command="close" aria-label="Close"></button>
     </div>
-
     <div class="dialog-body">
         <form id="rolesForm" @submit.prevent="submitForm()">
-            <!-- Input Nama Role -->
             <div class="mb-3">
-                <label for="name" class="form-label">Nama Role</label>
-                <input type="text" class="form-control form-control-sm" :class="{ 'is-invalid': errors.name }" id="name" x-model="form.name" required>
+                <x-form.input name="name" label="Role" x-model="form.name" x-bind:class="{ 'is-invalid': errors.name }" required />
                 <template x-if="errors.name">
-                    <div class="invalid-feedback" x-text="errors.name"></div>
+                    <div class="invalid-feedback d-block" x-text="errors.name"></div>
                 </template>
             </div>
 
@@ -44,8 +41,8 @@
                         </div>
                     </template>
                 </div>
-                <template x-if="errors.permissions || errors['permissions.0']">
-                    <div class="text-danger small mt-1" x-text="errors.permissions || errors['permissions.0']"></div>
+                <template x-if="permissionsError">
+                    <div class="text-danger small mt-1" x-text="permissionsError"></div>
                 </template>
             </div>
         </form>
@@ -53,14 +50,22 @@
 
     <div class="dialog-footer">
         <x-button-close commandfor="rolesModal" command="close" />
-        <x-button-save form="rolesForm" />
+        <button type="button" class="btn btn-subtle theme-primary" @click="submitForm()">Simpan</button>
     </div>
 </dialog>
+
+<style>
+    #rolesForm input[x-model][aria-invalid="true"],
+    #rolesForm select[x-model][aria-invalid="true"] {
+        border-color: var(--bs-danger);
+    }
+</style>
 
 <script>
     document.addEventListener('alpine:init', () => {
         Alpine.data('roleModal', (initialModules = []) => ({
             isEdit: false,
+            originalForm: {},
             permissionModules: initialModules,
             form: {
                 id: '',
@@ -69,6 +74,16 @@
             },
             errors: {},
 
+            get permissionsError() {
+                if (this.errors.permissions) {
+                    return this.errors.permissions;
+                }
+
+                const error = Object.entries(this.errors).find(([field]) => field.startsWith('permissions.'));
+
+                return error ? error[1] : '';
+            },
+
             openAdd() {
                 this.isEdit = false;
                 this.form = {
@@ -76,6 +91,7 @@
                     name: '',
                     permissions: []
                 };
+                this.originalForm = {};
                 this.errors = {};
                 document.getElementById('rolesModal').showModal();
             },
@@ -85,7 +101,12 @@
                 this.form = {
                     id: item.id,
                     name: item.name,
-                    permissions: item.enabled_permissions || []
+                    permissions: Array.isArray(item.enabled_permissions)
+                        ? [...item.enabled_permissions]
+                        : []
+                };
+                this.originalForm = {
+                    ...this.form
                 };
                 this.errors = {};
                 document.getElementById('rolesModal').showModal();
@@ -110,15 +131,8 @@
                 request
                     .then(response => {
                         document.getElementById('rolesModal').close();
-                        window.dispatchEvent(new CustomEvent('role-saved'));
-
-                        window.dispatchEvent(new CustomEvent('show-toast', {
-                            detail: {
-                                title: 'Berhasil',
-                                message: response.data.message || 'Data berhasil disimpan.',
-                                type: 'success'
-                            }
-                        }));
+                        window.dispatchEvent(new CustomEvent('roles-saved'));
+                        alert(response.data.message || 'Data berhasil disimpan.');
                     })
                     .catch(error => {
                         if (error.response) {
@@ -127,31 +141,24 @@
                                 for (const field in backendErrors) {
                                     this.errors[field] = backendErrors[field][0];
                                 }
+                                this.$nextTick(() => {
+                                    document.querySelectorAll('#rolesForm [x-model]').forEach(el => {
+                                        const field = el.getAttribute('x-model').split('.').pop();
+                                        if (this.errors[field]) {
+                                            el.setAttribute('aria-invalid', 'true');
+                                        } else {
+                                            el.removeAttribute('aria-invalid');
+                                        }
+                                    });
+                                });
+                                alert('Validasi gagal. Periksa kembali isian Anda.');
                             } else if (error.response.status === 403) {
-                                window.dispatchEvent(new CustomEvent('show-toast', {
-                                    detail: {
-                                        title: 'Akses Ditolak',
-                                        message: 'Anda tidak memiliki permission untuk melakukan aksi ini.',
-                                        type: 'error'
-                                    }
-                                }));
+                                alert('Akses Ditolak: Anda tidak memiliki permission untuk melakukan aksi ini.');
                             } else {
-                                window.dispatchEvent(new CustomEvent('show-toast', {
-                                    detail: {
-                                        title: 'Kesalahan Server',
-                                        message: error.response.data.message || 'Terjadi kesalahan pada server.',
-                                        type: 'error'
-                                    }
-                                }));
+                                alert('Kesalahan Server: ' + (error.response.data.message || 'Terjadi kesalahan pada server.'));
                             }
                         } else {
-                            window.dispatchEvent(new CustomEvent('show-toast', {
-                                detail: {
-                                    title: 'Koneksi Gagal',
-                                    message: 'Tidak dapat terhubung ke server.',
-                                    type: 'error'
-                                }
-                            }));
+                            alert('Koneksi Gagal: Tidak dapat terhubung ke server.');
                         }
                     });
             }

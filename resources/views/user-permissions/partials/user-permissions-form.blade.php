@@ -39,8 +39,8 @@
                         </div>
                     </template>
                 </div>
-                <template x-if="errors.permissions || errors['permissions.0']">
-                    <div class="text-danger small mt-1" x-text="errors.permissions || errors['permissions.0']"></div>
+                <template x-if="permissionsError">
+                    <div class="text-danger small mt-1" x-text="permissionsError"></div>
                 </template>
             </div>
         </form>
@@ -48,14 +48,22 @@
 
     <div class="dialog-footer">
         <x-button-close commandfor="user-permissionsModal" command="close" />
-        <x-button-save form="user-permissionsForm" />
+        <button type="button" class="btn btn-subtle theme-primary" @click="submitForm()">Simpan</button>
     </div>
 </dialog>
+
+<style>
+    #user-permissionsForm input[x-model][aria-invalid="true"],
+    #user-permissionsForm select[x-model][aria-invalid="true"] {
+        border-color: var(--bs-danger);
+    }
+</style>
 
 <script>
     document.addEventListener('alpine:init', () => {
         Alpine.data('userPermissionModal', (modules = []) => ({
             permissionModules: modules,
+            originalForm: {},
             form: {
                 id: '',
                 name: '',
@@ -65,13 +73,27 @@
             },
             errors: {},
 
+            get permissionsError() {
+                if (this.errors.permissions) {
+                    return this.errors.permissions;
+                }
+
+                const error = Object.entries(this.errors).find(([field]) => field.startsWith('permissions.'));
+
+                return error ? error[1] : '';
+            },
+
             openEdit(user) {
                 this.form = {
                     id: user.id,
                     name: user.name,
                     email: user.email,
                     nrk: user.nrk,
-                    permissions: [...user.permission_names]
+                    permissions: Array.isArray(user.permission_names) ? [...user.permission_names] : []
+                };
+                this.originalForm = {
+                    ...this.form,
+                    permissions: [...this.form.permissions]
                 };
                 this.errors = {};
                 document.getElementById('user-permissionsModal').showModal();
@@ -80,38 +102,45 @@
             submitForm() {
                 this.errors = {};
 
+                const formData = {
+                    permissions: [...this.form.permissions]
+                };
+
                 axios.put(
                     "{{ route('user-permissions.update', ['user' => '__ID__']) }}".replace('__ID__', this.form.id),
-                    { permissions: [...this.form.permissions] }
+                    formData
                 )
                     .then(response => {
                         document.getElementById('user-permissionsModal').close();
                         window.dispatchEvent(new CustomEvent('user-permissions-saved'));
-                        window.dispatchEvent(new CustomEvent('show-toast', {
-                            detail: {
-                                title: 'Berhasil',
-                                message: response.data.message || 'Permission user berhasil diperbarui.',
-                                type: 'success'
-                            }
-                        }));
+                        alert(response.data.message || 'Data berhasil disimpan.');
                     })
                     .catch(error => {
-                        if (error.response?.status === 422 && error.response.data.errors) {
-                            for (const field in error.response.data.errors) {
-                                this.errors[field] = error.response.data.errors[field][0];
+                        if (error.response) {
+                            if (error.response.status === 422 && error.response.data.errors) {
+                                const backendErrors = error.response.data.errors;
+                                for (const field in backendErrors) {
+                                    this.errors[field] = backendErrors[field][0];
+                                }
+                                this.$nextTick(() => {
+                                    document.querySelectorAll('#user-permissionsForm [x-model]').forEach(el => {
+                                        const field = el.getAttribute('x-model').split('.').pop();
+                                        if (this.errors[field]) {
+                                            el.setAttribute('aria-invalid', 'true');
+                                        } else {
+                                            el.removeAttribute('aria-invalid');
+                                        }
+                                    });
+                                });
+                                alert('Validasi gagal. Periksa kembali isian Anda.');
+                            } else if (error.response.status === 403) {
+                                alert('Akses Ditolak: Anda tidak memiliki permission untuk melakukan aksi ini.');
+                            } else {
+                                alert('Kesalahan Server: ' + (error.response.data.message || 'Terjadi kesalahan pada server.'));
                             }
-                            return;
+                        } else {
+                            alert('Koneksi Gagal: Tidak dapat terhubung ke server.');
                         }
-
-                        window.dispatchEvent(new CustomEvent('show-toast', {
-                            detail: {
-                                title: error.response?.status === 403 ? 'Akses Ditolak' : 'Gagal Menyimpan',
-                                message: error.response?.status === 403 ?
-                                    'Anda tidak memiliki permission untuk melakukan aksi ini.' :
-                                    error.response?.data?.message || 'Permission user tidak dapat diperbarui.',
-                                type: 'error'
-                            }
-                        }));
                     });
             }
         }));

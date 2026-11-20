@@ -5,53 +5,35 @@
     </div>
     <div class="dialog-body">
         <form id="usersForm" @submit.prevent="submitForm()">
-            <div class="mb-3">
-                <label for="name" class="form-label">Nama User</label>
-                <input type="text" class="form-control form-control-sm" :class="{ 'is-invalid': errors.name }" id="name" x-model="form.name" required>
-                <template x-if="errors.name">
-                    <div class="invalid-feedback" x-text="errors.name"></div>
-                </template>
-            </div>
-            <div class="mb-3">
-                <label for="nrk" class="form-label">NRK</label>
-                <input type="text" class="form-control form-control-sm" :class="{ 'is-invalid': errors.nrk }" id="nrk" x-model="form.nrk" required>
-                <template x-if="errors.nrk">
-                    <div class="invalid-feedback" x-text="errors.nrk"></div>
-                </template>
-            </div>
-            <div class="mb-3">
-                <label for="department_id" class="form-label">Department</label>
-                <select class="form-control form-control-sm" :class="{ 'is-invalid': errors.department_id }" id="department_id" x-model="form.department_id" required>
-                    <option value="">Pilih Department</option>
-                    @foreach($departments as $id => $name)
-                    <option value="{{ $id }}">{{ $name }}</option>
-                    @endforeach
-                </select>
-                <template x-if="errors.department_id">
-                    <div class="invalid-feedback" x-text="errors.department_id"></div>
-                </template>
-            </div>
-            <div class="mb-3">
-                <label for="email" class="form-label">Email</label>
-                <input type="email" class="form-control form-control-sm" :class="{ 'is-invalid': errors.email }" id="email" x-model="form.email" required>
-                <template x-if="errors.email">
-                    <div class="invalid-feedback" x-text="errors.email"></div>
-                </template>
-            </div>
-            <div class="mb-3">
-                <label for="password" class="form-label">Password</label>
-                <input type="text" class="form-control form-control-sm" :class="{ 'is-invalid': errors.password }" id="password" x-model="form.password">
-                <template x-if="errors.password">
-                    <div class="invalid-feedback" x-text="errors.password"></div>
-                </template>
-            </div>
-            <div class="mb-3">
-                <label for="password_confirmation" class="form-label">Confirm Password</label>
-                <input type="text" class="form-control form-control-sm" :class="{ 'is-invalid': errors.password_confirmation }" id="password_confirmation" x-model="form.password_confirmation">
-                <template x-if="errors.password_confirmation">
-                    <div class="invalid-feedback" x-text="errors.password_confirmation"></div>
-                </template>
-            </div>
+            <x-form.input name="name" label="Nama User" x-model="form.name" required />
+            <template x-if="errors.name">
+                <div class="invalid-feedback d-block" x-text="errors.name"></div>
+            </template>
+
+            <x-form.input name="nrk" label="NRK" x-model="form.nrk" required />
+            <template x-if="errors.nrk">
+                <div class="invalid-feedback d-block" x-text="errors.nrk"></div>
+            </template>
+
+            <x-form.select name="department_id" label="Department" :options="$departments" placeholder="Pilih Department" x-model="form.department_id" required />
+            <template x-if="errors.department_id">
+                <div class="invalid-feedback d-block" x-text="errors.department_id"></div>
+            </template>
+
+            <x-form.input name="email" label="Email" type="email" x-model="form.email" required />
+            <template x-if="errors.email">
+                <div class="invalid-feedback d-block" x-text="errors.email"></div>
+            </template>
+
+            <x-form.password-strength name="password" label="Password" :toggle="true" x-model="form.password" />
+            <template x-if="errors.password">
+                <div class="invalid-feedback d-block" x-text="errors.password"></div>
+            </template>
+
+            <x-form.password-strength name="password_confirmation" label="Konfirmasi Password" :toggle="true" x-model="form.password_confirmation" />
+            <template x-if="errors.password_confirmation">
+                <div class="invalid-feedback d-block" x-text="errors.password_confirmation"></div>
+            </template>
 
             <div class="mb-3" x-show="isEdit">
                 <label class="form-label">Status</label>
@@ -76,9 +58,16 @@
 
     <div class="dialog-footer">
         <x-button-close commandfor="usersModal" command="close" />
-        <x-button-save form="usersForm" />
+        <button type="button" class="btn btn-subtle theme-primary" @click="submitForm()">Simpan</button>
     </div>
 </dialog>
+
+<style>
+    #usersForm input[x-model][aria-invalid="true"],
+    #usersForm select[x-model][aria-invalid="true"] {
+        border-color: var(--bs-danger);
+    }
+</style>
 
 <script>
     document.addEventListener('alpine:init', () => {
@@ -156,13 +145,7 @@
                         document.getElementById('usersModal').close();
                         window.dispatchEvent(new CustomEvent('user-saved'));
 
-                        window.dispatchEvent(new CustomEvent('show-toast', {
-                            detail: {
-                                title: 'Berhasil',
-                                message: response.data.message || 'Data berhasil disimpan.',
-                                type: 'success'
-                            }
-                        }));
+                        alert(response.data.message || 'Data berhasil disimpan.');
                     })
                     .catch(error => {
                         if (error.response) {
@@ -171,31 +154,24 @@
                                 for (const field in backendErrors) {
                                     this.errors[field] = backendErrors[field][0];
                                 }
+                                this.$nextTick(() => {
+                                    document.querySelectorAll('#usersForm [x-model]').forEach(el => {
+                                        const field = el.getAttribute('x-model').split('.').pop();
+                                        if (this.errors[field]) {
+                                            el.setAttribute('aria-invalid', 'true');
+                                        } else {
+                                            el.removeAttribute('aria-invalid');
+                                        }
+                                    });
+                                });
+                                alert('Validasi gagal. Periksa kembali isian Anda.');
                             } else if (error.response.status === 403) {
-                                window.dispatchEvent(new CustomEvent('show-toast', {
-                                    detail: {
-                                        title: 'Akses Ditolak',
-                                        message: 'Anda tidak memiliki permission untuk melakukan aksi ini.',
-                                        type: 'error'
-                                    }
-                                }));
+                                alert('Akses Ditolak: Anda tidak memiliki permission untuk melakukan aksi ini.');
                             } else {
-                                window.dispatchEvent(new CustomEvent('show-toast', {
-                                    detail: {
-                                        title: 'Kesalahan Server',
-                                        message: error.response.data.message || 'Terjadi kesalahan pada server.',
-                                        type: 'error'
-                                    }
-                                }));
+                                alert('Kesalahan Server: ' + (error.response.data.message || 'Terjadi kesalahan pada server.'));
                             }
                         } else {
-                            window.dispatchEvent(new CustomEvent('show-toast', {
-                                detail: {
-                                    title: 'Koneksi Gagal',
-                                    message: 'Tidak dapat terhubung ke server.',
-                                    type: 'error'
-                                }
-                            }));
+                            alert('Koneksi Gagal: Tidak dapat terhubung ke server.');
                         }
                     });
             }

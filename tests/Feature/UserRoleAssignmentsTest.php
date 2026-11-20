@@ -21,6 +21,8 @@ class UserRoleAssignmentsTest extends TestCase
         $this->actingAs($admin)
             ->get(route('user-roles.index'))
             ->assertOk()
+            ->assertSee('@user-roles-saved.window="fetchData(items.current_page)"', false)
+            ->assertSee("new CustomEvent('user-roles-saved')", false)
             ->assertSee('Atur Role User')
             ->assertSee('editor')
             ->assertDontSee('Tambah UserRole Baru')

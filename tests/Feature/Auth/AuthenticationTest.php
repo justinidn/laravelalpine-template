@@ -6,6 +6,7 @@ use App\Models\Department;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
+use PragmaRX\Google2FA\Google2FA;
 use Spatie\Permission\Models\Permission;
 use Tests\TestCase;
 
@@ -77,27 +78,50 @@ class AuthenticationTest extends TestCase
         $user = $this->createUser();
 
         $this->actingAs($user)
+            ->get(route('two-factor.secret-key'))
+            ->assertRedirect(route('password.confirm'));
+
+        $this->actingAs($user)
             ->get(route('profile.edit'))
             ->assertOk()
-            ->assertSee('Confirm your password before managing two-factor authentication.');
+            ->assertSee('Konfirmasi kata sandi Anda terlebih dahulu untuk mengelola autentikasi dua faktor.');
 
         $this->get(route('profile.two-factor.confirmed'))
             ->assertRedirect(route('password.confirm'));
+
+        $this->get(route('password.confirm'))
+            ->assertOk()
+            ->assertSee('Konfirmasi Kata Sandi');
 
         $this->post(route('password.confirm'), ['password' => 'password'])
             ->assertRedirect(route('profile.two-factor.confirmed'));
 
         $this->get(route('profile.edit'))
-            ->assertSee('Enable two-factor authentication');
+            ->assertSee('Aktifkan Google Authenticator');
 
         $this->post(route('two-factor.enable'))->assertRedirect();
 
         $this->assertNotNull($user->fresh()->two_factor_secret);
         $this->assertNull($user->fresh()->two_factor_confirmed_at);
 
+        $this->get(route('profile.edit'))
+            ->assertSee('Kunci rahasia');
+
         $this->get(route('two-factor.qr-code'))
             ->assertOk()
             ->assertJsonStructure(['svg', 'url']);
+
+        $this->get(route('two-factor.secret-key'))
+            ->assertOk()
+            ->assertJson([
+                'secretKey' => Crypt::decrypt($user->fresh()->two_factor_secret),
+            ]);
+
+        $code = app(Google2FA::class)->getCurrentOtp(Crypt::decrypt($user->fresh()->two_factor_secret));
+
+        $this->post(route('two-factor.confirm'), ['code' => $code])->assertRedirect();
+
+        $this->assertTrue($user->fresh()->hasEnabledTwoFactorAuthentication());
     }
 
     public function test_users_can_not_authenticate_with_invalid_password(): void
@@ -111,6 +135,20 @@ class AuthenticationTest extends TestCase
         ]);
 
         $this->assertGuest();
+    }
+
+    public function test_unverified_users_cannot_authenticate(): void
+    {
+        $user = $this->createUser(['email_verified_at' => null]);
+        $user->givePermissionTo(Permission::findOrCreate('system.login', 'web'));
+
+        $response = $this->post('/login', [
+            'email' => $user->email,
+            'password' => 'password',
+        ]);
+
+        $this->assertGuest();
+        $response->assertSessionHasErrors('email');
     }
 
     public function test_users_without_system_login_permission_cannot_authenticate(): void

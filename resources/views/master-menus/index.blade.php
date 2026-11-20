@@ -1,40 +1,73 @@
 <x-app-layout>
-    <div x-data="masterMenuPage(
-        @js(auth()->user()->can('master-menus.update'))
-    )" x-on:master-menu-saved.window="refreshTable()">
-        <x-table-data
-            name="masterMenusList"
-            endpoint="{{ route('master-menus.index') }}"
-            :pagination="true">
+    <div class="mb-3">
+        <x-breadcrumbs :items="Breadcrumbs::generate('master-menus.index')" />
+    </div>
 
-            <div class="row align-items-center g-2 mb-2">
-                <label for="masterMenuSearch" class="col-auto col-form-label" style="width: 110px;">Menus</label>
-                <div class="col">
-                    <input type="text" class="form-control form-control-sm" id="masterMenuSearch" x-model.trim="filters.search">
+    {{-- Header halaman: judul + keterangan di kiri, tombol tambah di kanan --}}
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3" x-data="{}">
+        <div>
+            <h1 class="h4 fw-bold text-body-emphasis mb-1">Halaman Master Menu</h1>
+            <div class="form-text">Kelola data Master Menu.</div>
+        </div>
+        <div class="flex-shrink-0">
+            @can('master-menus.create')
+            <x-button-add x-on:click="$dispatch('open-master-menus-modal')" />
+            @endcan
+        </div>
+    </div>
+    <hr>
+
+    <div x-data="masterMenuPage">
+        <x-table-data name="masterMenusList" endpoint="{{ route('master-menus.index') }}" :pagination="true" :refreshEvents="['master-menus-saved']">
+
+            {{-- Slot: langsung input search + tombol filter (sesuai komponen x-table-data terbaru) --}}
+            <label class="form-control form-control-sm form-adorn flex-grow-1 mb-0">
+                <div class="form-adorn-icon" aria-hidden="true">
+                    <i class="bi bi-search"></i>
                 </div>
+                <input type="search" class="form-ghost w-100" placeholder="Cari Master Menu ..." x-model.trim="filters.search" @input.debounce.400ms="applyFilters()">
+            </label>
+
+            <div class="flex-shrink-0">
+                <span class="d-inline-block rounded-3" tabindex="0" data-bs-toggle="popover" data-bs-trigger="hover focus" data-bs-content="Advanced Search">
+                    <button class="btn-solid theme-primary btn-sm" type="button" data-bs-toggle="drawer" data-bs-target="#drawerRight" aria-controls="drawerRight"><i class="bi bi-funnel-fill"></i></button>
+                </span>
             </div>
 
-            <div class="col-auto d-flex align-items-center gap-2 mb-3">
-                <x-button-search @click="fetchData(1)" />
-                @can('master-menus.create')
-                <x-button-add @click="$dispatch('open-master-menu-modal')" />
-                @endcan
-            </div>
+            <dialog class="drawer drawer-end" data-bs-backdrop="false" data-bs-scroll="true" tabindex="-1" id="drawerRight" aria-labelledby="drawerRightLabel">
+                <div class="drawer-header">
+                    <h5 class="drawer-title" id="drawerRightLabel">Advanced Filters</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="drawer" aria-label="Close"></button>
+                </div>
+                <div class="drawer-body">
+                    <div class="mb-1">
+                        <label for="status" class="form-label">Status</label>
+                        <select class="form-control form-control-sm" id="status" x-model="filters.status">
+                            <option value="">Semua Status</option>
+                            <option value="1">Active</option>
+                            <option value="0">Inactive</option>
+                        </select>
+                    </div>
+
+                    <x-button-search @click="applyFilters()" />
+                </div>
+            </dialog>
 
             <x-slot name="thead" class="text-center">
                 <th style="width: 50px;" class="text-center">No</th>
-                <th class="text-start">Module</th>
+                <th>Nama</th>
                 @canany(['master-menus.update', 'master-menus.delete'])
-                <th style="width: 120px;" class="text-center">Action</th>
+                <th style="width: 140px;" class="text-center">Aksi</th>
                 @endcanany
             </x-slot>
 
             <x-slot name="tbody">
                 <td class="text-center" x-text="(items.from || 1) + index"></td>
                 <td class="text-start">
-                    <span class="fw-semibold" x-text="item.display_name"></span>
-                    <span class="text-muted small ms-1" x-text="'(' + item.name + ')'"></span>
+                    <div class="fw-semibold" x-text="item.display_name"></div>
+                    <div class="form-text" x-text="item.name"></div>
                 </td>
+
                 @canany(['master-menus.update', 'master-menus.delete'])
                 <td class="text-center">
                     <div class="position-relative">
@@ -59,64 +92,27 @@
             </x-slot>
         </x-table-data>
 
-        @include('master-menus.partials.master-menu-form')
+        {{-- Include Modal Form --}}
+        @include('master-menus.partials.master-menus-form')
     </div>
 
     <script>
         document.addEventListener('alpine:init', () => {
-            Alpine.data('masterMenuPage', (canUpdatePermissions) => ({
-                canUpdatePermissions,
-
-                refreshTable() {
-                    const table = this.$el.querySelector('.card');
-                    if (table && Alpine.$data(table)) {
-                        Alpine.$data(table).fetchData(1);
-                    }
-                },
-
-                editItem(menu) {
-                    if (!this.canUpdatePermissions) {
-                        return;
-                    }
-
-                    axios.get("{{ route('master-menus.edit', ['masterMenu' => '__ID__']) }}".replace('__ID__', menu.id))
-                        .then(response => {
-                            window.dispatchEvent(new CustomEvent('edit-master-menu-modal', {
-                                detail: response.data.data
-                            }));
-                        })
-                        .catch(error => {
-                            window.dispatchEvent(new CustomEvent('show-toast', {
-                                detail: {
-                                    title: error.response?.status === 403 ? 'Akses Ditolak' : 'Gagal Memuat Module',
-                                    message: error.response?.data?.message || 'Data module tidak dapat dimuat.',
-                                    type: 'error'
-                                }
-                            }));
-                        });
+            Alpine.data('masterMenuPage', () => ({
+                editItem(item) {
+                    window.dispatchEvent(new CustomEvent('edit-master-menus-modal', {
+                        detail: item
+                    }));
                 },
                 deleteItem(id) {
                     if (confirm('Yakin ingin menghapus data ini?')) {
                         axios.delete("{{ route('master-menus.destroy', ['masterMenu' => '__ID__']) }}".replace('__ID__', id))
                             .then(response => {
-                                window.dispatchEvent(new CustomEvent('master-menu-saved'));
-                                window.dispatchEvent(new CustomEvent('show-toast', {
-                                    detail: {
-                                        title: 'Berhasil',
-                                        message: response.data.message || 'Data berhasil dihapus.',
-                                        type: 'success'
-                                    }
-                                }));
+                                window.dispatchEvent(new CustomEvent('master-menus-saved'));
+                                alert(response.data.message || 'Data berhasil dihapus.');
                             })
                             .catch(error => {
-                                let errorMsg = error.response?.data?.message || 'Terjadi kesalahan pada server.';
-                                window.dispatchEvent(new CustomEvent('show-toast', {
-                                    detail: {
-                                        title: 'Peringatan',
-                                        message: errorMsg,
-                                        type: 'error'
-                                    }
-                                }));
+                                alert(error.response?.data?.message || 'Terjadi kesalahan pada server.');
                             });
                     }
                 }

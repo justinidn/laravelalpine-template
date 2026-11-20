@@ -6,18 +6,15 @@
     <div class="dialog-body">
         <form id="departmentsForm" @submit.prevent="submitForm()">
             <div class="mb-3">
-                <label for="departments_name" class="form-label">Nama Department</label>
-                <input type="text" class="form-control form-control-sm" :class="{ 'is-invalid': errors.department_name }" id="departments_name" x-model="form.department_name" required>
+                <x-form.input name="department_name" label="Nama Department" x-model="form.department_name" x-bind:class="{ 'is-invalid': errors.department_name }" required />
                 <template x-if="errors.department_name">
-                    <div class="invalid-feedback" x-text="errors.department_name"></div>
+                    <div class="invalid-feedback d-block" x-text="errors.department_name"></div>
                 </template>
             </div>
-
             <div class="mb-3">
-                <label for="departments_alias" class="form-label">Alias</label>
-                <input type="text" class="form-control form-control-sm" :class="{ 'is-invalid': errors.department_alias }" id="departments_alias" x-model="form.department_alias" required>
+                <x-form.input name="department_alias" label="Alias" x-model="form.department_alias" x-bind:class="{ 'is-invalid': errors.department_alias }" required />
                 <template x-if="errors.department_alias">
-                    <div class="invalid-feedback" x-text="errors.department_alias"></div>
+                    <div class="invalid-feedback d-block" x-text="errors.department_alias"></div>
                 </template>
             </div>
 
@@ -25,22 +22,27 @@
                 <label class="form-label">Status</label>
                 <div class="form-field">
                     <div class="switch" style="--bs-switch-width: 2.75rem; --bs-switch-indicator-width: 1.5rem;">
-                        <input type="checkbox" value="1" id="switchCustomWidth" role="switch" switch x-model="form.is_active">
+                        <input type="checkbox" value="1" id="switchActiveDepartment" role="switch" switch x-model="form.is_active">
                     </div>
-                    <label for="switchCustomWidth">Active</label>
+                    <label for="switchActiveDepartment">Active</label>
                 </div>
             </div>
         </form>
     </div>
 
-
-
     <div class="dialog-footer">
         <x-button-close commandfor="departmentsModal" command="close" />
-        <x-button-save form="departmentsForm" />
+        <button type="button" class="btn btn-subtle theme-primary" @click="submitForm()">Simpan</button>
     </div>
-
 </dialog>
+
+<style>
+    #departmentsForm input[x-model][aria-invalid="true"],
+    #departmentsForm select[x-model][aria-invalid="true"] {
+        border-color: var(--bs-danger);
+    }
+</style>
+
 <script>
     document.addEventListener('alpine:init', () => {
         Alpine.data('departmentModal', () => ({
@@ -52,7 +54,7 @@
                 department_alias: '',
                 is_active: true
             },
-            errors: {}, // <-- Tambahkan state untuk menampung error per field
+            errors: {},
 
             openAdd() {
                 this.isEdit = false;
@@ -63,7 +65,7 @@
                     is_active: true
                 };
                 this.originalForm = {};
-                this.errors = {}; // Reset error saat buka modal
+                this.errors = {};
                 document.getElementById('departmentsModal').showModal();
             },
 
@@ -85,77 +87,49 @@
             submitForm() {
                 this.errors = {};
 
-                const updateData = Object.fromEntries(
-                    Object.entries(this.form)
-                    .filter(([field, value]) => field !== 'id' && value !== this.originalForm[field])
-                );
-
-                if (this.isEdit && Object.keys(updateData).length === 0) {
-                    window.dispatchEvent(new CustomEvent('show-toast', {
-                        detail: {
-                            title: 'Informasi',
-                            message: 'Tidak ada perubahan data yang dilakukan.',
-                            type: 'success'
-                        }
-                    }));
-                    document.getElementById('departmentsModal').close();
-                    return;
-                }
+                const formData = {
+                    ...this.form
+                };
 
                 const request = this.isEdit ?
                     axios.put(
-                        "{{ route('departments.update', ['department' => '__DEPARTMENT_ID__']) }}"
-                        .replace('__DEPARTMENT_ID__', this.form.id),
-                        updateData
+                        "{{ route('departments.update', ['department' => '__ID__']) }}"
+                        .replace('__ID__', this.form.id),
+                        formData
                     ) :
-                    axios.post("{{ route('departments.store') }}", this.form);
+                    axios.post("{{ route('departments.store') }}", formData);
 
                 request
                     .then(response => {
                         document.getElementById('departmentsModal').close();
                         window.dispatchEvent(new CustomEvent('department-saved'));
-
-                        window.dispatchEvent(new CustomEvent('show-toast', {
-                            detail: {
-                                title: 'Berhasil',
-                                message: response.data.message || 'Departemen berhasil disimpan.',
-                                type: 'success'
-                            }
-                        }));
+                        alert(response.data.message || 'Data berhasil disimpan.');
                     })
                     .catch(error => {
                         if (error.response) {
-
                             if (error.response.status === 422 && error.response.data.errors) {
                                 const backendErrors = error.response.data.errors;
                                 for (const field in backendErrors) {
                                     this.errors[field] = backendErrors[field][0];
                                 }
+                                this.$nextTick(() => {
+                                    document.querySelectorAll('#departmentsForm [x-model]').forEach(el => {
+                                        const field = el.getAttribute('x-model').split('.').pop();
+                                        if (this.errors[field]) {
+                                            el.setAttribute('aria-invalid', 'true');
+                                        } else {
+                                            el.removeAttribute('aria-invalid');
+                                        }
+                                    });
+                                });
+                                alert('Validasi gagal. Periksa kembali isian Anda.');
                             } else if (error.response.status === 403) {
-                                window.dispatchEvent(new CustomEvent('show-toast', {
-                                    detail: {
-                                        title: 'Akses Ditolak',
-                                        message: 'Anda tidak memiliki permission untuk melakukan aksi ini.',
-                                        type: 'error'
-                                    }
-                                }));
+                                alert('Akses Ditolak: Anda tidak memiliki permission untuk melakukan aksi ini.');
                             } else {
-                                window.dispatchEvent(new CustomEvent('show-toast', {
-                                    detail: {
-                                        title: 'Kesalahan Server',
-                                        message: error.response.data.message || 'Terjadi kesalahan pada server.',
-                                        type: 'error'
-                                    }
-                                }));
+                                alert('Kesalahan Server: ' + (error.response.data.message || 'Terjadi kesalahan pada server.'));
                             }
                         } else {
-                            window.dispatchEvent(new CustomEvent('show-toast', {
-                                detail: {
-                                    title: 'Koneksi Gagal',
-                                    message: 'Tidak dapat terhubung ke server.',
-                                    type: 'error'
-                                }
-                            }));
+                            alert('Koneksi Gagal: Tidak dapat terhubung ke server.');
                         }
                     });
             }

@@ -1,0 +1,5 @@
+// Home > {{modelName}} (Index)
+Breadcrumbs::for('{{pluralKebab}}.index', function (BreadcrumbTrail $trail) {
+    $trail->parent('dashboard');
+    $trail->push('{{modelName}}', route('{{pluralKebab}}.index'));
+});

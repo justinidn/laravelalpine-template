@@ -23,6 +23,8 @@ class UserPermissionAssignmentsTest extends TestCase
         $this->actingAs($admin)
             ->get(route('user-permissions.index'))
             ->assertOk()
+            ->assertSee('@user-permissions-saved.window="fetchData(items.current_page)"', false)
+            ->assertSee("new CustomEvent('user-permissions-saved')", false)
             ->assertSee('Inventory')
             ->assertSee('inventory.view')
             ->assertSee('inventory.update')

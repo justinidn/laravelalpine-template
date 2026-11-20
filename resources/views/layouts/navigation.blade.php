@@ -1,4 +1,4 @@
-<nav class="navbar md:navbar-expand bg-1" data-bs-theme="dark">
+<nav class="navbar md:navbar-expand theme-light shadow" data-bs-theme="light">
     <div class="container-fluid">
         <a class="navbar-brand" href="{{ route('dashboard') }}">{{ config('app.name', 'Laravel') }}</a>
 
@@ -15,61 +15,51 @@
             <div class="drawer-body mb-2 md:mb-0">
                 <ul class="nav navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ route('dashboard') }}">
-                            Dashboard
-                        </a>
+                        <a class="nav-link text-secondary nav-hover-primary" href="{{ route('dashboard') }}"><i class="bi bi-speedometer2"></i>Dashboard</a>
                     </li>
+                    @canany(['master-menus.view', 'roles.view', 'user-roles.view', 'user-permissions.view'])
                     <li class="nav-item">
-                        <button class="nav-link" type="button" data-bs-toggle="menu" aria-expanded="false">
-                            Sites Settings
-                        </button>
+                        <button class="nav-link text-secondary nav-hover-primary" type="button" data-bs-toggle="menu" aria-expanded="false"><i class="bi bi-wrench-adjustable"></i> Sites Settings</button>
                         <div class="menu">
-                            <a class="menu-item" href="{{ route('master-menus.index') }}">
-                                Master Menus
-                            </a>
-                            <a class="menu-item" href="{{ route('roles.index') }}">
-                                Roles
-                            </a>
-                            <a class="menu-item" href="{{ route('user-roles.index') }}">
-                                User Roles
-                            </a>
-                            <a class="menu-item" href="{{ route('user-permissions.index') }}">
-                                User Permissions
-                            </a>
-
+                            @can('master-menus.view')
+                            <a class="menu-item" href="{{ route('master-menus.index') }}">Master Menus</a>
+                            @endcan
+                            @can('roles.view')
+                            <a class="menu-item" href="{{ route('roles.index') }}">Roles</a>
+                            @endcan
+                            @can('user-roles.view')
+                            <a class="menu-item" href="{{ route('user-roles.index') }}">User Roles</a>
+                            @endcan
+                            @can('user-permissions.view')
+                            <a class="menu-item" href="{{ route('user-permissions.index') }}">User Permissions</a>
+                            @endcan
                         </div>
                     </li>
+                    @endcanany
+                    @canany(['users.view', 'departments.view'])
                     <li class="nav-item">
-                        <button class="nav-link" type="button" data-bs-toggle="menu" aria-expanded="false">
-                            Master
-                        </button>
+                        <button class="nav-link text-secondary nav-hover-primary" type="button" data-bs-toggle="menu" aria-expanded="false"><i class="bi bi-database"></i> Master</button>
                         <div class="menu">
-                            <a class="menu-item" href="{{ route('users.index') }}">
-                                Users
-                            </a>
-                            <a class="menu-item" href="{{ route('departments.index') }}">
-                                Department
-                            </a>
-
+                            @can('users.view')
+                            <a class="menu-item" href="{{ route('users.index') }}">Users</a>
+                            @endcan
+                            @can('departments.view')
+                            <a class="menu-item" href="{{ route('departments.index') }}">Department</a>
+                            @endcan
                         </div>
                     </li>
+                    @endcanany
                 </ul>
 
                 <ul class="nav navbar-nav ms-auto">
                     <li class="nav-item">
-                        <button class="nav-link" type="button" data-bs-toggle="menu" aria-expanded="false">
-                            <i class="bi bi-person"></i> {{ Auth::user()->name }}
-                        </button>
+                        <button class="nav-link text-secondary nav-hover-primary" type="button" data-bs-toggle="menu" aria-expanded="false"><i class="bi bi-person"></i> {{ Auth::user()->name }}</button>
                         <div class="menu">
-                            <a class="menu-item" href="{{ route('profile.edit') }}">Profile</a>
-
+                            <a class="menu-item" href="{{ route('profile.edit') }}"><i class="bi bi-person-gear me-2"></i>Profil &amp; Keamanan</a>
                             <hr class="menu-divider">
-
                             <form method="POST" action="{{ route('logout') }}">
                                 @csrf
-                                <a class="menu-item text-danger" href="{{ route('logout') }}" onclick="event.preventDefault(); this.closest('form').submit();">
-                                    Log Out
-                                </a>
+                                <a class="menu-item text-danger" href="{{ route('logout') }}" onclick="event.preventDefault(); this.closest('form').submit();">Log Out</a>
                             </form>
                         </div>
                     </li>

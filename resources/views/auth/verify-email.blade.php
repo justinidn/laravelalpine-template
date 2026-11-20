@@ -1,31 +1,39 @@
-<x-guest-layout>
-    <div class="mb-4 text-sm text-gray-600">
-        {{ __('Thanks for signing up! Before getting started, could you verify your email address by clicking on the link we just emailed to you? If you didn\'t receive the email, we will gladly send you another.') }}
-    </div>
+<x-guest-layout title="Verifikasi Email">
+    <div class="card border shadow-sm rounded-4 overflow-hidden">
+        <div class="bg-primary" style="height: 4px;"></div>
 
-    @if (session('status') == 'verification-link-sent')
-        <div class="mb-4 font-medium text-sm text-green-600">
-            {{ __('A new verification link has been sent to the email address you provided during registration.') }}
-        </div>
-    @endif
-
-    <div class="mt-4 flex items-center justify-between">
-        <form method="POST" action="{{ route('verification.send') }}">
-            @csrf
-
-            <div>
-                <x-primary-button>
-                    {{ __('Resend Verification Email') }}
-                </x-primary-button>
+        <div class="card-body p-4 p-sm-5">
+            <div class="text-center mb-4">
+                <div class="d-inline-flex align-items-center justify-content-center bg-primary bg-opacity-10 rounded-circle mb-3" style="width: 56px; height: 56px;">
+                    <i class="bi bi-envelope-check-fill text-primary fs-4"></i>
+                </div>
+                <h1 class="h5 fw-bold text-body-emphasis mb-1">Konfirmasi Email Anda</h1>
+                <p class="small text-body-secondary mb-0">
+                    Kami mengirim tautan konfirmasi. Konfirmasi email sebelum masuk ke akun.
+                </p>
             </div>
-        </form>
 
-        <form method="POST" action="{{ route('logout') }}">
-            @csrf
+            @if (session('status') === 'verification-link-sent')
+                <div class="alert alert-success small rounded-3 mb-4" role="status">
+                    Jika email terdaftar dan belum dikonfirmasi, tautan konfirmasi akan dikirim.
+                </div>
+            @endif
 
-            <button type="submit" class="underline text-sm text-gray-600 hover:text-gray-900 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                {{ __('Log Out') }}
-            </button>
-        </form>
+            <form method="POST" action="{{ route('verification.send') }}">
+                @csrf
+
+                <x-form.input name="email" label="Alamat Email" type="email" icon="bi-envelope" placeholder="nama@contoh.com" :value="old('email', session('email'))" required autocomplete="email" inputmode="email" />
+
+                <button type="submit" class="btn bg-primary text-white btn-lg w-100 fw-semibold shadow-sm d-flex align-items-center justify-content-center gap-2">
+                    <i class="bi bi-send text-white"></i>
+                    <span class="text-white">Kirim ulang tautan konfirmasi</span>
+                </button>
+
+                <p class="text-center small text-body-secondary mt-4 mb-0">
+                    Sudah mengonfirmasi email?
+                    <a href="{{ route('login') }}" class="fw-semibold text-decoration-none">Masuk</a>
+                </p>
+            </form>
+        </div>
     </div>
 </x-guest-layout>

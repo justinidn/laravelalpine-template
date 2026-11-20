@@ -2,9 +2,11 @@
 
 namespace Tests\Feature\Auth;
 
+use App\Models\Department;
 use App\Models\User;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
@@ -16,14 +18,16 @@ class PasswordResetTest extends TestCase
     {
         $response = $this->get('/forgot-password');
 
-        $response->assertStatus(200);
+        $response->assertOk()
+            ->assertSee('Lupa Kata Sandi?')
+            ->assertSee('Kirim tautan reset');
     }
 
     public function test_reset_password_link_can_be_requested(): void
     {
         Notification::fake();
 
-        $user = User::factory()->create();
+        $user = $this->createUser();
 
         $this->post('/forgot-password', ['email' => $user->email]);
 
@@ -34,14 +38,15 @@ class PasswordResetTest extends TestCase
     {
         Notification::fake();
 
-        $user = User::factory()->create();
+        $user = $this->createUser();
 
         $this->post('/forgot-password', ['email' => $user->email]);
 
         Notification::assertSentTo($user, ResetPassword::class, function ($notification) {
             $response = $this->get('/reset-password/'.$notification->token);
 
-            $response->assertStatus(200);
+            $response->assertOk()
+                ->assertSee('Atur Ulang Kata Sandi');
 
             return true;
         });
@@ -51,7 +56,7 @@ class PasswordResetTest extends TestCase
     {
         Notification::fake();
 
-        $user = User::factory()->create();
+        $user = $this->createUser();
 
         $this->post('/forgot-password', ['email' => $user->email]);
 
@@ -59,15 +64,28 @@ class PasswordResetTest extends TestCase
             $response = $this->post('/reset-password', [
                 'token' => $notification->token,
                 'email' => $user->email,
-                'password' => 'password',
-                'password_confirmation' => 'password',
+                'password' => 'new-password',
+                'password_confirmation' => 'new-password',
             ]);
 
             $response
                 ->assertSessionHasNoErrors()
                 ->assertRedirect(route('login'));
+            $this->assertTrue(Hash::check('new-password', $user->fresh()->password));
 
             return true;
         });
+    }
+
+    private function createUser(): User
+    {
+        $department = Department::query()->create([
+            'department_alias' => 'TEST',
+            'department_name' => 'Test Department',
+        ]);
+
+        return User::factory()->create([
+            'department_id' => $department->id,
+        ]);
     }
 }

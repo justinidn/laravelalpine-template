@@ -11,7 +11,8 @@ use Illuminate\Support\Str;
 class MakeCrudCommand extends Command
 {
     protected $signature = 'make:crud {name : Nama Model (contoh: User, Department, Product)}';
-    protected $description = 'Membuat modul CRUD lengkap (Model, Controller, Service, Request, Views) sesuai standar enterprise dengan fitur skip jika file sudah ada';
+
+    protected $description = 'Membuat modul CRUD lengkap (Model, Controller, Service, Request, Views, Breadcrumbs) sesuai standar enterprise dengan fitur skip jika file sudah ada';
 
     public function handle(): void
     {
@@ -42,6 +43,9 @@ class MakeCrudCommand extends Command
         // 4. Generate Views (Index & Form Modal)
         $this->generateViews($pluralKebab, $singularVariable, $variableName, $modelName);
 
+        // 5. Generate Breadcrumbs Route
+        $this->generateBreadcrumbs($pluralKebab, $modelName);
+
         $this->info("Proses scaffolding modul [{$modelName}] selesai!");
     }
 
@@ -51,14 +55,15 @@ class MakeCrudCommand extends Command
 
         if (File::exists($path)) {
             $this->line("<comment>Skipped Model (sudah ada):</comment> {$path}");
+
             return;
         }
 
         $stub = File::get(base_path('stubs/custom-crud/model.stub'));
         $stub = str_replace([
-            '{{modelName}}'
+            '{{modelName}}',
         ], [
-            $modelName
+            $modelName,
         ], $stub);
 
         File::ensureDirectoryExists(dirname($path));
@@ -73,6 +78,7 @@ class MakeCrudCommand extends Command
 
         if (File::exists($path)) {
             $this->line("<comment>Skipped Request (sudah ada):</comment> {$path}");
+
             return;
         }
 
@@ -80,11 +86,11 @@ class MakeCrudCommand extends Command
         $stub = str_replace([
             '{{class}}',
             '{{singularVariable}}',
-            '{{pluralSnake}}'
+            '{{pluralSnake}}',
         ], [
             "{$modelName}Request",
             $singularVariable,
-            $pluralSnake
+            $pluralSnake,
         ], $stub);
 
         File::ensureDirectoryExists(dirname($path));
@@ -99,6 +105,7 @@ class MakeCrudCommand extends Command
 
         if (File::exists($path)) {
             $this->line("<comment>Skipped Service (sudah ada):</comment> {$path}");
+
             return;
         }
 
@@ -106,11 +113,11 @@ class MakeCrudCommand extends Command
         $stub = str_replace([
             '{{modelName}}',
             '{{variableName}}',
-            '{{singularVariable}}'
+            '{{singularVariable}}',
         ], [
             $modelName,
             $variableName,
-            $singularVariable
+            $singularVariable,
         ], $stub);
 
         File::ensureDirectoryExists(dirname($path));
@@ -125,6 +132,7 @@ class MakeCrudCommand extends Command
 
         if (File::exists($path)) {
             $this->line("<comment>Skipped Controller (sudah ada):</comment> {$path}");
+
             return;
         }
 
@@ -134,13 +142,13 @@ class MakeCrudCommand extends Command
             '{{pluralKebab}}',
             '{{pluralSnake}}',
             '{{variableName}}',
-            '{{singularVariable}}'
+            '{{singularVariable}}',
         ], [
             $modelName,
             $pluralKebab,
             $pluralSnake,
             $variableName,
-            $singularVariable
+            $singularVariable,
         ], $stub);
 
         File::ensureDirectoryExists(dirname($path));
@@ -158,6 +166,9 @@ class MakeCrudCommand extends Command
         File::ensureDirectoryExists($viewPath);
         File::ensureDirectoryExists("{$viewPath}/partials");
 
+        // Judul yang ramah dibaca (MasterMenu -> Master Menu)
+        $readableName = Str::headline($modelName);
+
         // Index View
         if (File::exists($indexPath)) {
             $this->line("<comment>Skipped Index View (sudah ada):</comment> {$indexPath}");
@@ -167,12 +178,12 @@ class MakeCrudCommand extends Command
                 '{{pluralKebab}}',
                 '{{singularVariable}}',
                 '{{variableName}}',
-                '{{modelName}}'
+                '{{modelName}}',
             ], [
                 $pluralKebab,
                 $singularVariable,
                 $variableName,
-                $modelName
+                $readableName,
             ], $indexStub);
             File::put($indexPath, $indexStub);
             $this->line("<info>Created Index View:</info> {$indexPath}");
@@ -186,14 +197,56 @@ class MakeCrudCommand extends Command
             $formStub = str_replace([
                 '{{pluralKebab}}',
                 '{{singularVariable}}',
-                '{{modelName}}'
+                '{{modelName}}',
             ], [
                 $pluralKebab,
                 $singularVariable,
-                $modelName
+                $readableName,
             ], $formStub);
             File::put($formPath, $formStub);
             $this->line("<info>Created Form View:</info> {$formPath}");
         }
+    }
+
+    protected function generateBreadcrumbs(string $pluralKebab, string $modelName): void
+    {
+        $stubPath = base_path('stubs/custom-crud/breadcrumbs.stub');
+        $routePath = base_path('routes/breadcrumbs.php');
+
+        // Pastikan folder stubs ada
+        File::ensureDirectoryExists(dirname($stubPath));
+
+        // Pastikan file breadcrumbs.php ada
+        if (! File::exists($routePath)) {
+            $initialContent = "<?php\n\nuse Diglactic\\Breadcrumbs\\Breadcrumbs;\nuse Diglactic\\Breadcrumbs\\Generator as BreadcrumbTrail;\n\n";
+            $initialContent .= "Breadcrumbs::for('dashboard', function (BreadcrumbTrail \$trail) {\n    \$trail->push('Dashboard', route('dashboard'));\n});\n\n";
+            File::put($routePath, $initialContent);
+        }
+
+        $content = File::get($routePath);
+
+        // Cek apakah breadcrumb untuk route ini sudah ada
+        if (Str::contains($content, "Breadcrumbs::for('{$pluralKebab}.index'")) {
+            $this->line("<comment>Skipped Breadcrumbs (sudah ada):</comment> route {$pluralKebab}.index");
+
+            return;
+        }
+
+        // Ambil stub dan ganti placeholder
+        $stub = File::get($stubPath);
+        $readableName = Str::headline($modelName);
+
+        $newBreadcrumb = str_replace([
+            '{{pluralKebab}}',
+            '{{modelName}}',
+        ], [
+            $pluralKebab,
+            $readableName,
+        ], $stub);
+
+        // Tambahkan ke akhir file
+        File::append($routePath, "\n".$newBreadcrumb."\n");
+
+        $this->info("<info>Created Breadcrumbs:</info> {$pluralKebab}.index");
     }
 }

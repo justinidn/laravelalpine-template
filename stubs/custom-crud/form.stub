@@ -9,7 +9,7 @@
                 <label for="name" class="form-label">Nama {{modelName}}</label>
                 <input type="text" class="form-control form-control-sm" :class="{ 'is-invalid': errors.name }" id="name" x-model="form.name" required>
                 <template x-if="errors.name">
-                    <div class="invalid-feedback" x-text="errors.name"></div>
+                    <div class="invalid-feedback d-block" x-text="errors.name"></div>
                 </template>
             </div>
 
@@ -27,9 +27,16 @@
 
     <div class="dialog-footer">
         <x-button-close commandfor="{{pluralKebab}}Modal" command="close" />
-        <x-button-save form="{{pluralKebab}}Form" />
+        <button type="button" class="btn btn-subtle theme-primary" @click="submitForm()">Simpan</button>
     </div>
 </dialog>
+
+<style>
+    #{{pluralKebab}}Form input[x-model][aria-invalid="true"],
+    #{{pluralKebab}}Form select[x-model][aria-invalid="true"] {
+        border-color: var(--bs-danger);
+    }
+</style>
 
 <script>
     document.addEventListener('alpine:init', () => {
@@ -69,68 +76,53 @@
                 document.getElementById('{{pluralKebab}}Modal').showModal();
             },
 
-           submitForm() {
-    this.errors = {};
+            submitForm() {
+                this.errors = {};
 
-    // Menggunakan seluruh data dari this.form secara utuh
-    const formData = { ...this.form };
+                const formData = { ...this.form };
 
-    const request = this.isEdit ?
-        axios.put(
-            "{{ route('{{pluralKebab}}.update', ['{{singularVariable}}' => '__ID__']) }}"
-            .replace('__ID__', this.form.id),
-            formData
-        ) :
-        axios.post("{{ route('{{pluralKebab}}.store') }}", formData);
+                const request = this.isEdit ?
+                    axios.put(
+                        "{{ route('{{pluralKebab}}.update', ['{{singularVariable}}' => '__ID__']) }}"
+                        .replace('__ID__', this.form.id),
+                        formData
+                    ) :
+                    axios.post("{{ route('{{pluralKebab}}.store') }}", formData);
 
-    request
-        .then(response => {
-            document.getElementById('{{pluralKebab}}Modal').close();
-            window.dispatchEvent(new CustomEvent('{{singularVariable}}-saved'));
-
-            window.dispatchEvent(new CustomEvent('show-toast', {
-                detail: {
-                    title: 'Berhasil',
-                    message: response.data.message || 'Data berhasil disimpan.',
-                    type: 'success'
-                }
-            }));
-        })
-        .catch(error => {
-            if (error.response) {
-                if (error.response.status === 422 && error.response.data.errors) {
-                    const backendErrors = error.response.data.errors;
-                    for (const field in backendErrors) {
-                        this.errors[field] = backendErrors[field][0];
-                    }
-                } else if (error.response.status === 403) {
-                    window.dispatchEvent(new CustomEvent('show-toast', {
-                        detail: {
-                            title: 'Akses Ditolak',
-                            message: 'Anda tidak memiliki permission untuk melakukan aksi ini.',
-                            type: 'error'
+                request
+                    .then(response => {
+                        document.getElementById('{{pluralKebab}}Modal').close();
+                        window.dispatchEvent(new CustomEvent('{{pluralKebab}}-saved'));
+                        alert(response.data.message || 'Data berhasil disimpan.');
+                    })
+                    .catch(error => {
+                        if (error.response) {
+                            if (error.response.status === 422 && error.response.data.errors) {
+                                const backendErrors = error.response.data.errors;
+                                for (const field in backendErrors) {
+                                    this.errors[field] = backendErrors[field][0];
+                                }
+                                this.$nextTick(() => {
+                                    document.querySelectorAll('#{{pluralKebab}}Form [x-model]').forEach(el => {
+                                        const field = el.getAttribute('x-model').split('.').pop();
+                                        if (this.errors[field]) {
+                                            el.setAttribute('aria-invalid', 'true');
+                                        } else {
+                                            el.removeAttribute('aria-invalid');
+                                        }
+                                    });
+                                });
+                                alert('Validasi gagal. Periksa kembali isian Anda.');
+                            } else if (error.response.status === 403) {
+                                alert('Akses Ditolak: Anda tidak memiliki permission untuk melakukan aksi ini.');
+                            } else {
+                                alert('Kesalahan Server: ' + (error.response.data.message || 'Terjadi kesalahan pada server.'));
+                            }
+                        } else {
+                            alert('Koneksi Gagal: Tidak dapat terhubung ke server.');
                         }
-                    }));
-                } else {
-                    window.dispatchEvent(new CustomEvent('show-toast', {
-                        detail: {
-                            title: 'Kesalahan Server',
-                            message: error.response.data.message || 'Terjadi kesalahan pada server.',
-                            type: 'error'
-                        }
-                    }));
-                }
-            } else {
-                window.dispatchEvent(new CustomEvent('show-toast', {
-                    detail: {
-                        title: 'Koneksi Gagal',
-                        message: 'Tidak dapat terhubung ke server.',
-                        type: 'error'
-                    }
-                }));
+                    });
             }
-        });
-}
         }));
     });
 </script>

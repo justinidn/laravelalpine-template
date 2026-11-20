@@ -1,4 +1,10 @@
 @import 'bootstrap/dist/css/bootstrap.min.css';
 @import "bootstrap-icons/font/bootstrap-icons.css";
 
-
+/* Hover untuk menu utama navbar: teks primary + background subtle primary */
+.navbar .nav-hover-primary:hover,
+.navbar .nav-hover-primary:focus {
+    color: var(--bs-primary) !important;
+    background-color: var(--bs-primary-bg-subtle) !important;
+    border-radius: 0.375rem; /* Opsional, agar background terlihat rapi */
+}
